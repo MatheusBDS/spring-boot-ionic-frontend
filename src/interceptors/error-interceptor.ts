@@ -1,47 +1,90 @@
-import { StorageService } from './../services/storage.service';
-import { Observable } from 'rxjs/Rx';
+import { StorageService } from "./../services/storage.service";
+import { Observable } from "rxjs/Rx";
 import { Injectable } from "@angular/core";
-import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HTTP_INTERCEPTORS } from "@angular/common/http";
+import {
+  HttpInterceptor,
+  HttpRequest,
+  HttpHandler,
+  HttpEvent,
+  HTTP_INTERCEPTORS
+} from "@angular/common/http";
+import { AlertController } from "ionic-angular";
 
 @Injectable()
-export class ErrorInterceptor implements HttpInterceptor{
+export class ErrorInterceptor implements HttpInterceptor {
+  constructor(
+    public storage: StorageService,
+    public alertCtrl: AlertController
+  ) {}
 
-  constructor(public storage: StorageService) {}
-
-  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-
-    return next.handle(req)
-    .catch((error, caugth) => {
-
+  intercept(
+    req: HttpRequest<any>,
+    next: HttpHandler
+  ): Observable<HttpEvent<any>> {
+    return next.handle(req).catch((error, caugth) => {
       let errorObj = error;
-      if(errorObj.error){
+      if (errorObj.error) {
         errorObj = errorObj.error;
       }
-      if(!errorObj.status){
+      if (!errorObj.status) {
         errorObj = JSON.parse(errorObj);
       }
 
       console.log("Erro detectado pelo interceptor:");
       console.log(errorObj);
 
-      switch(errorObj.status){
+      switch (errorObj.status) {
+        case 401:
+          this.handle401();
+          break;
+
         case 403:
           this.handle403();
-        break;
+          break;
+
+        default:
+          this.handleDefaultEror(errorObj);
       }
 
       return Observable.throw(errorObj);
     }) as any;
   }
 
-  handle403(){
+  handle401() {
+    let alert = this.alertCtrl.create({
+      title: "Erro 401: Falha de Autenticação",
+      message: "E-mail ou Senha Incorretos",
+      enableBackdropDismiss: false,
+      buttons: [
+        {
+          text: "ok"
+        }
+      ]
+    });
+    alert.present();
+  }
+
+  handle403() {
     this.storage.setLocalUser(null);
   }
 
+  handleDefaultEror(errorObj) {
+    let alert = this.alertCtrl.create({
+      title: "Erro " + errorObj.status + ": " + errorObj.error,
+      message: errorObj.message,
+      enableBackdropDismiss: false,
+      buttons: [
+        {
+          text: "Ok"
+        }
+      ]
+    });
+    alert.present();
+  }
 }
 
 export const ErrorInterceptorProvider = {
   provide: HTTP_INTERCEPTORS,
   useClass: ErrorInterceptor,
-  multi: true,
+  multi: true
 };
